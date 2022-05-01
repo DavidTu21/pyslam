@@ -175,7 +175,7 @@ def draw_random_lines(img,N=200):
         pt1x, pt2x = np.random.randint( -0.5*w, w*1.5, 2)
         pt1y, pt2y = np.random.randint( -0.5*h, h*1.5, 2)
         color = tuple(np.random.randint(0,255,3).tolist())
-        thickness = np.random.randint(1, 10)
+        thickness = 10
         cv2.line(img, (pt1x,pt1y), (pt2x,pt2y), color, thickness, lineType)
         
         

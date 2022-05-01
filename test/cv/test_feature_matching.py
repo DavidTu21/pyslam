@@ -3,7 +3,7 @@ import numpy as np
 import cv2 
 from matplotlib import pyplot as plt
 
-sys.path.append("../../")
+sys.path.append("/Users/mingxiaotu/Desktop/pyslam/")
 from config import Config
 
 from mplot_figure import MPlotFigure
@@ -13,18 +13,84 @@ from feature_types import FeatureDetectorTypes, FeatureDescriptorTypes, FeatureI
 from feature_matcher import feature_matcher_factory, FeatureMatcherTypes
 from utils_img import combine_images_horizontally, rotate_img, transform_img, add_background
 from utils_geom import add_ones
-from utils_features import descriptor_sigma_mad, compute_hom_reprojection_error
+from utils_features import descriptor_sigma_mad
 from utils_draw import draw_feature_matches
 
 from feature_tracker_configs import FeatureTrackerConfigs
 
 from timer import TimerFps
 
+# cd to the parent folder
+# Activate the environment $ . pyenv-activate.sh 
+# python3 test/cv/test_feature_matching.py 1
 
+def combine_images_horizontally(img1, img2): 
+    if img1.ndim<=2:
+        img1 = cv2.cvtColor(img1,cv2.COLOR_GRAY2RGB)    
+    if img2.ndim<=2:
+        img2 = cv2.cvtColor(img2,cv2.COLOR_GRAY2RGB)                     
+    h1, w1 = img1.shape[:2]
+    h2, w2 = img2.shape[:2]
+    img3 = np.zeros((max(h1, h2), w1+w2,3), np.uint8)
+    img3[:h1, :w1,:3] = img1
+    img3[:h2, w1:w1+w2,:3] = img2
+    return img3 
+
+def draw_feature_matches_horizontally(img1, img2, kps1, kps2, kps1_sizes=None, kps2_sizes=None):
+    img3 = combine_images_horizontally(img1,img2)    
+    h1,w1 = img1.shape[:2]    
+    N = len(kps1)
+    default_size = 2
+    if kps1_sizes is None:
+        kps1_sizes = np.ones(N,dtype=np.int32)*default_size
+    if kps2_sizes is None:
+        kps2_sizes = np.ones(N,dtype=np.int32)*default_size   
+    i = 0     
+    for i,pts in enumerate(zip(kps1, kps2)):
+        p1, p2 = np.rint(pts).astype(int)
+        a,b = p1.ravel()
+        c,d = p2.ravel()
+        size1 = kps1_sizes[i] 
+        size2 = kps2_sizes[i]    
+        color = tuple(np.random.randint(0,255,3).tolist())
+        #cv2.line(img3, (a,b),(c,d), color, 1)    # optic flow style         
+        cv2.line(img3, (a,b),(c+w1,d), color, 1)  # join corrisponding points 
+        cv2.circle(img3,(a,b),2, color,-1)   
+        cv2.circle(img3,(a,b), color=(0, 255, 0), radius=int(size1), thickness=1)  # draw keypoint size as a circle 
+        cv2.circle(img3,(c+w1,d),2, color,-1) 
+        cv2.circle(img3,(c+w1,d), color=(0, 255, 0), radius=int(size2), thickness=1)  # draw keypoint size as a circle  
+        i += 1
+    print(i)
+    return img3
+# Compute homography reprojection error
+def compute_hom_reprojection_error(H, kps1, kps2, img2, mask=None):   
+
+    # @ is a binary operator, used for matrix multiplicaiton
+    kps1_reproj = H @ add_ones(kps1).T
+    
+    #print(f'kps1_reproj has a shape of {np.shape(kps1_reproj)}') # (3,14)
+    kps1_reproj = kps1_reproj[:2]/kps1_reproj[2]
+    prediction = kps1_reproj.T
+    # for i in range(len(prediction)):
+    #     # red is the predicted
+    #     cv2.circle(img2, (int(prediction[i][0]),int(prediction[i][1])), 20, (0,0,255), 2)
+    #print(f'kps1_reproj has a shape of {np.shape(kps1_reproj)}') # (2,14)
+    error_vecs = kps1_reproj.T - kps2
+    dis_ls = []
+    
+    # calculate the average distance, they are tuples btw
+    for i in range(len(kps2)):
+        #print(i,kps2[i][0],kps2[i][1], prediction[i][0], prediction[i][1])
+        # sqrt((x2-x1)^2 + (y2-y1)^2)
+        dis = ((kps2[i][0] - prediction[i][0])**2 + (kps2[i][1] - prediction[i][1])**2)**0.5
+        dis_ls.append(dis) 
+    print(f'The value returned by using Euclean distance is {np.mean(dis_ls)}, the standard deviation is {np.std(dis_ls)}')
+    
+    #return np.mean(np.sum(error_vecs*error_vecs,axis=1))
+    return
 # ==================================================================================================
 # N.B.: test the feature tracker and its feature matching capability 
 # ==================================================================================================
-
 
 timer = TimerFps(name='detection+description+matching')
 
@@ -38,7 +104,7 @@ img1_box = None               # image 1 bounding box (initialization)
 model_fitting_type = None     # 'homography' or 'fundamental' (automatically set below, this is an initialization)
 draw_horizontal_layout=True   # draw matches with the two images in an horizontal or vertical layout (automatically set below, this is an initialization) 
 
-test_type='graf'             # select the test type (there's a template below to add your test)
+test_type='rat'             # select the test type (there's a template below to add your test)
 #  
 if test_type == 'box': 
     img1 = cv2.imread('../data/box.png')          # queryImage  
@@ -74,11 +140,11 @@ if test_type == 'mars':
     model_fitting_type='homography' 
     draw_horizontal_layout = True         
 # 
-# if test_type == 'your test':   # add your test here 
-#     img1 = cv2.imread('...') 
-#     img2 = cv2.imread('...')
-#     model_fitting_type='...' 
-#     draw_horizontal_layout = True     
+if test_type == 'rat':   # add your test here 
+    img1 = cv2.imread('test/data/graf1.png') 
+    img2 = cv2.imread('test/data/graf2.png')
+    model_fitting_type='homography' 
+    draw_horizontal_layout = True     
     
 if img1 is None:
     raise IOError('Cannot find img1')    
@@ -116,11 +182,25 @@ if False:
 
 num_features=2000 
 
-tracker_type = FeatureTrackerTypes.DES_BF      # descriptor-based, brute force matching with knn 
-#tracker_type = FeatureTrackerTypes.DES_FLANN  # descriptor-based, FLANN-based matching 
+#tracker_type = FeatureTrackerTypes.DES_BF      # descriptor-based, brute force matching with knn 
+tracker_type = FeatureTrackerTypes.DES_FLANN  # descriptor-based, FLANN-based matching 
 
+# Get the type from the user input
+main_type = sys.argv[1]
 # select your tracker configuration (see the file feature_tracker_configs.py) 
-tracker_config = FeatureTrackerConfigs.TEST
+# if main_type == 'superpoint':
+#     tracker_config = FeatureTrackerConfigs.SUPERPOINT
+# elif main_type == 'disk':
+#     tracker_config = FeatureTrackerConfigs.DISK
+# elif main_type == 'keynet':
+#     tracker_config = FeatureTrackerConfigs.KEYNET
+# # elif main_type == 'r2d2':
+# #     tracker_config = FeatureTrackerConfigs.KEYNET
+# elif main_type == 'tomasi':
+#     tracker_config = FeatureTrackerConfigs.LK_SHI_TOMASI
+# elif main_type == 'context':
+#     tracker_config = FeatureTrackerConfigs.CONTEXTDESC
+tracker_config = FeatureTrackerConfigs.SUPERPOINT
 tracker_config['num_features'] = num_features
 tracker_config['match_ratio_test'] = 0.8        # 0.7 is the default in feature_tracker_configs.py
 tracker_config['tracker_type'] = tracker_type
@@ -174,8 +254,8 @@ des2_matched = des2[idx2][:]
 kps2_size = kps2_size[idx2]
 
 # compute sigma mad of descriptor distances
-sigma_mad, dists = descriptor_sigma_mad(des1_matched,des2_matched,descriptor_distances=feature_tracker.descriptor_distances)
-print('3 x sigma-MAD of descriptor distances (all): ', 3 * sigma_mad)
+#sigma_mad, dists = descriptor_sigma_mad(des1_matched,des2_matched,descriptor_distances=feature_tracker.descriptor_distances)
+#print('3 x sigma-MAD of descriptor distances (all): ', 3 * sigma_mad)
 
 
 #============================================
@@ -205,8 +285,17 @@ if kps1_matched.shape[0] > 10:
         # draw the transformed box on img2  
         img2 = cv2.polylines(img2,[np.int32(pts_dst)],True,(0, 0, 255),3,cv2.LINE_AA)    
         
-        reprojection_error = compute_hom_reprojection_error(H, kps1_matched, kps2_matched, mask)
-        print('reprojection error: ', reprojection_error)
+        if mask is not None: 
+            # ravel() return a contiguous flattened array.
+            # A 1-D array, containing the elements of the input, is returned. 
+            mask_idxs = (mask.ravel() == 1) 
+
+            # Only use the inliers
+            kps1_inliers = kps1_matched[mask_idxs]
+            kps2_inliers = kps2_matched[mask_idxs]
+        print(f'Originally there are {len(kps1)} matches. There are {len(kps1_inliers)} inliers after the RANSAC.')
+        compute_hom_reprojection_error(H, kps1_inliers, kps2_inliers, mask)
+        #print('reprojection error: ', reprojection_error)
     else:  
         F, mask = cv2.findFundamentalMat(kps1_matched, kps2_matched, cv2.RANSAC, fmat_err_thld, confidence=0.999)
         n_inlier = np.count_nonzero(mask)
@@ -233,16 +322,21 @@ if mask is not None:
     print('num inliers: ', len(kps1_matched_inliers))
     print('inliers percentage: ', len(kps1_matched_inliers)/max(len(kps1_matched),1.)*100,'%')
         
-    sigma_mad_inliers, dists = descriptor_sigma_mad(des1_matched_inliers,des2_matched_inliers,descriptor_distances=feature_tracker.descriptor_distances)
-    print('3 x sigma-MAD of descriptor distances (inliers): ', 3 * sigma_mad)  
+    #sigma_mad_inliers, dists = descriptor_sigma_mad(des1_matched_inliers,des2_matched_inliers,descriptor_distances=feature_tracker.descriptor_distances)
+    #print('3 x sigma-MAD of descriptor distances (inliers): ', 3 * sigma_mad)  
     #print('distances: ', dists)  
+    img_matched_inliers = draw_feature_matches_horizontally(img1, img2, kps1_inliers, kps2_inliers)
+    fig2 = MPlotFigure(img_matched_inliers, title='Inlier matches')
+    MPlotFigure.show()
+    exit()
     img_matched_inliers = draw_feature_matches(img1, img2, kps1_matched_inliers, kps2_matched_inliers, kps1_size_inliers, kps2_size_inliers,draw_horizontal_layout)    
                           
                           
 img_matched = draw_feature_matches(img1, img2, kps1_matched, kps2_matched, kps1_size, kps2_size,draw_horizontal_layout)
                           
                                                 
-fig1 = MPlotFigure(img_matched, title='All matches')
+#fig1 = MPlotFigure(img_matched, title='All matches', main_type=main_type)
+fig1 = MPlotFigure(img_matched, title='All matches', main_type = main_type)
 if img_matched_inliers is not None: 
-    fig2 = MPlotFigure(img_matched_inliers, title='Inlier matches')
+    fig2 = MPlotFigure(img_matched_inliers, title='Inlier matches', main_type=main_type)
 MPlotFigure.show()

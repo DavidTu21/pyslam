@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 # refer to https://matplotlib.org/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure
 
 class MPlotFigure: 
-    def __init__(self, img, title=None, scale=1, dpi=100):
+    def __init__(self, img, title=None, scale=1, dpi=100, main_type = None):
         self.dpi = dpi  
         self.width = round(img.shape[0]*scale/dpi)
         self.height = round(img.shape[1]*scale/dpi)
@@ -35,6 +35,8 @@ class MPlotFigure:
         if title is not None: 
             self.fig.suptitle(title)
         plt.imshow(img)
+        saving_title = f'{title}_{main_type}.png'
+        plt.savefig(saving_title)
         plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis        
 
     # actually show the figures

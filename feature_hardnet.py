@@ -125,14 +125,14 @@ class HardnetFeature2D:
         
         print('==> Loading pre-trained network.')        
         self.model = HardNet()
-        self.checkpoint = torch.load(self.model_weights_path)
+        self.checkpoint = torch.load(self.model_weights_path, checkpoint = torch.load)
         self.model.load_state_dict(self.checkpoint['state_dict'])
         if self.do_cuda:
             self.model.cuda()
             print('Extracting on GPU')
         else:
             print('Extracting on CPU')
-            self.model = model.cpu()        
+            self.model = self.model.cpu()        
         self.model.eval()            
         print('==> Successfully loaded pre-trained network.')            
             

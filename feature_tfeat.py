@@ -64,13 +64,13 @@ class TfeatFeature2D:
         self.model = tfeat_model.TNet()
         self.models_path = self.model_base_path + 'pretrained-models'
         self.net_name = 'tfeat-liberty'
-        self.model.load_state_dict(torch.load(os.path.join(self.models_path,self.net_name+".params")))
+        self.model.load_state_dict(torch.load(os.path.join(self.models_path,self.net_name+".params"), map_location=torch.device('cpu') ))
         if self.do_cuda:
             self.model.cuda()
             print('Extracting on GPU')
         else:
             print('Extracting on CPU')
-            self.model = model.cpu()        
+            self.model = self.model.cpu()        
         self.model.eval()  
         print('==> Successfully loaded pre-trained network.')
     
